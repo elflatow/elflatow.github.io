@@ -1,0 +1,211 @@
+<style>
+.Content {
+ white-space: normal !important;
+}
+
+:root {
+  --arg1-color: rgba(0, 123, 255, 0.7);
+  --arg2-color: rgba(108, 239, 125, 0.7);
+  --soln-color: rgba(204, 0, 255, 0.9);
+  --soln-filter: drop-shadow(2px 10px 10px var(--soln-color));
+}
+
+#container {
+ display: flex;
+ flex-direction: column;
+ height: 100%;
+ gap: 2em;
+}
+
+#equation {
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ gap: 10px;
+}
+
+#equation * {
+ font-size: 2em;
+}
+
+#equation select {
+ appearance: none;
+ padding: 0 30px;
+}
+
+#equation button {
+ padding: 0 30px;
+}
+
+#grid {
+ display: grid;
+ grid-template-columns: repeat(auto-fill, 3ex);
+ grid-template-rows: repeat(auto-fill, 3ex);
+ gap: 2px;
+ flex-grow: 1;
+}
+
+#grid .cell {
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ border: 1px solid rgba(0, 0, 0, 0);
+ text-align: center;
+}
+</style>
+
+<div id="container">
+ <form id="equation">
+  <input type="number" style="color: var(--arg1-color)" placeholder="0" value="1">
+  <select class="operation">
+   <option value="add" selected>+</option>
+   <option value="subtract">-</option>
+   <option value="multiply">*</option>
+   <option value="divide">/</option>
+  </select>
+  <input type="number" style="color: var(--arg2-color)" placeholder="0" value="1">
+  <button type="submit">=</button>
+  <output type="number" style="color: var(--soln-color)"></output>
+ </form>
+ <div id="grid"></div>
+</div>
+
+<script type="module">
+ import * as Sky from 'https://www.flatown.com/sdk/sky.js';
+ const { abs, clip, max } = Sky;
+
+ const equation = Sky.$('#equation');
+ const args = equation.all('input[type=number]');
+ const op = equation.$('.operation');
+ const res = equation.$('output');
+ const grid = Sky.$('#grid');
+ const gcss = grid.css();
+ const M = gcss.gridTemplateRows.split(' ').length, O = ~~(M / 3);
+ const N = gcss.gridTemplateColumns.split(' ').length, P = ~~(N / 2);
+
+ function bgColorOrBorder(elem, val, color) {
+   return elem.style(val >= 0 ? { 'background-color': color } : { 'border': `1px solid ${color}` });
+ }
+
+ function render() {
+   const X = args.map(elem => Number(elem.node.value) || 0);
+   const f = op.node.value;
+
+   function add(a, b, sub = false) {
+     const sum = a + b;
+     for (let i = 0; i < abs(a); i++) {
+       const cell = grid.div({ class: 'cell' }).style({
+         'grid-row': O + 1,
+         'grid-column': a > 0 ? clip(P + i, 1, N) : clip(P - i - 1, 1, N),
+       });
+       bgColorOrBorder(cell, a, 'var(--arg1-color)');
+     }
+     for (let j = 0; j < abs(b); j++) {
+       const cell = grid.div({ class: 'cell' }).style({
+         'grid-row': O + 2,
+         'grid-column': b > 0 ? clip(P + a + j, 1, N) : clip(P + a - j - 1, 1, N),
+       });
+       bgColorOrBorder(cell, sub ? -b : b, 'var(--arg2-color)');
+     }
+     for (let k = 0; k < abs(sum); k++) {
+       const cell = grid.div({ class: 'cell' }).style({
+         'grid-row': O + 3,
+         'grid-column': sum > 0 ? clip(P + k, 1, N) : clip(P - k - 1, 1, N),
+       });
+       bgColorOrBorder(cell, sum, 'var(--soln-color)').style({ filter: 'var(--soln-filter' });
+     }
+     return sum;
+   }
+
+   function subtract(a, b) {
+     return add(a, -b, true);
+   }
+
+   function multiply(a, b) {
+     const product = a * b;
+     for (let i = 0; i < abs(a); i++) {
+       const cell = grid.div({ class: 'cell' }).style({
+         'grid-row': a > 0 ? clip(O + i, 1, M) : clip(O - i - 2, 1, M),
+         'grid-column': P - 1,
+       });
+       if (a > 0 && i == Math.floor(a))
+         cell.style({ 'height': `${(a - i) * 100}%` });
+       else if (a < 0 && i == Math.floor(-a))
+         cell.style({ 'height': `${(-a - i) * 100}%`, 'align-self': 'end' });
+       bgColorOrBorder(cell, a, 'var(--arg1-color)');
+     }
+     for (let j = 0; j < abs(b); j++) {
+       const cell = grid.div({ class: 'cell' }).style({
+         'grid-row': O - 1,
+         'grid-column': b > 0 ? clip(P + j, 1, N) : clip(P - j - 2, 1, N),
+       });
+       if (b > 0 && j == Math.floor(b))
+         cell.style({ 'width': `${(b - j) * 100}%` });
+       else if (b < 0 && j == Math.floor(-b))
+         cell.style({ 'width': `${(-b - j) * 100}%`, 'justify-self': 'end' });
+       bgColorOrBorder(cell, b, 'var(--arg2-color)');
+     }
+     for (let i = 0; i < abs(a); i++) {
+       for (let j = 0; j < abs(b); j++) {
+         const cell = grid.div({ class: 'cell' }).style({
+           'grid-row': a > 0 ? clip(O + i, 1, M) : clip(O - i - 2, 1, M),
+           'grid-column': b > 0 ? clip(P + j, 1, N) : clip(P - j - 2, 1, N),
+         });
+         // XXX fractions in here?
+         bgColorOrBorder(cell, product, 'var(--soln-color)').style({ filter: 'var(--soln-filter' });
+       }
+     }
+     return product;
+   }
+
+   function divide(a, b) {
+     const quotient = a / b, Q = Number.isFinite(quotient) ? quotient : 0;
+     for (let i = 0; i < abs(Q); i++) {
+       const cell = grid.div({ class: 'cell' }).style({
+         'grid-row': quotient > 0 ? clip(O + i, 1, M) : clip(O - i - 2, 1, M),
+         'grid-column': P - 1,
+       });
+       if (quotient > 0 && i == Math.floor(quotient))
+         cell.style({ 'height': `${(quotient - i) * 100}%` });
+       else if (quotient < 0 && i == Math.floor(-quotient))
+         cell.style({ 'height': `${(-quotient - i) * 100}%`, 'align-self': 'end' });
+       bgColorOrBorder(cell, quotient, 'var(--soln-color)').style({ filter: 'var(--soln-filter' });
+     }
+     for (let j = 0; j < abs(b); j++) {
+       const cell = grid.div({ class: 'cell' }).style({
+         'grid-row': O - 1,
+         'grid-column': b > 0 ? clip(P + j, 1, N) : clip(P - j - 2, 1, N),
+       });
+       bgColorOrBorder(cell, b, 'var(--arg2-color)');
+     }
+     for (let i = 0, k = abs(a); i < abs(Q); i++) {
+       for (let j = 0; j < abs(b); j++, k--) {
+         if (k > 0) {
+           const cell = grid.div({ class: 'cell' }).style({
+             'grid-row': quotient > 0 ? clip(O + i, 1, M) : clip(O - i - 2, 1, M),
+             'grid-column': b > 0 ? clip(P + j, 1, N) : clip(P - j - 2, 1, N),
+           });
+           // XXX fractions in here?
+           bgColorOrBorder(cell, a, 'var(--arg1-color)');
+         }
+       }
+     }
+     return quotient;
+   }
+
+   function apply(f) {
+     switch (f) {
+       case 'add': return add(...X);
+       case 'subtract': return subtract(...X);
+       case 'multiply': return multiply(...X);
+       case 'divide': return divide(...X);
+     }
+   }
+
+   grid.clear();
+   res.txt(apply(f));
+ }
+
+ equation.on('change submit', (e) => render());
+ render();
+</script>
